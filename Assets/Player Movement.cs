@@ -1,169 +1,46 @@
-using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
-
+public class PlayerMovement : MonoBehaviour
 {
-    public class PlayerMovement : MonoBehaviour
+    public float speed = 5f;
+    public float mouseSensitivity = 2f;
+    public Transform playerCamera;
+
+    private Rigidbody rb;
+    private float verticalRotation = 0f;
+
+    void Start()
     {
-        [SerializeField] private GameObject headObject;
-        [SerializeField] private float jumpVelocity = 4.5f;
-        [SerializeField] private float walkingSpeed = 5.0f;
-        [SerializeField] private float sprintingSpeed = 8.0f;
-        [SerializeField] private float crouchingSpeed = 3.0f;
-        [SerializeField] private float mouseSensitivity = 0.4f;
-        [SerializeField] private float lerpSpeed = 10.0f;
-        [SerializeField] private float crouchCameraY = -0.25f;
-        [SerializeField] private float crouchColliderHeight = 1.5f;
-        [SerializeField] private float crouchColliderY = -0.25f;
-        // [SerializeField] private float gravity = -9.8f; // No need since we using a rigidbody
-        [SerializeField] private LayerMask groundMask;
-        
-        private float _currentSpeed = 5.0f;
-        private Vector3 _direction = Vector3.zero;
-        private Vector3 _inputDirection = Vector3.zero;
-        private bool _headWillCollide = false;
-        private bool _canMove = false;
-        private bool _grounded = false;
-        private Vector3 _currentVel = Vector3.zero;
-        private float _headRotationX = 0f;
-        private float _headRotationY = 0f;
+        rb = GetComponent<Rigidbody>();
+        Cursor.lockState = CursorLockMode.Locked; // Lock the cursor to the center
+    }
 
-        private KeyCode _crouchKey = KeyCode.LeftControl;
-        
-        private CapsuleCollider _playerCollisionShape;
-        private Rigidbody _playerRigidbody;
+    void FixedUpdate()
+    {
+        // Get input for movement
+        float moveX = Input.GetAxis("Horizontal"); // A/D keys
+        float moveZ = Input.GetAxis("Vertical");   // W/S keys
 
-        private EventInstance _playerWalk; // sound
+        // Create movement vector
+        Vector3 move = new Vector3(moveX, 0, moveZ);
+        move = transform.TransformDirection(move); // Convert to world space
 
-        
-        private void Start()
-        {
-            // getting all the components
-            _playerCollisionShape = GetComponent<CapsuleCollider>();
-            _playerRigidbody = GetComponent<Rigidbody>();
-            
-            // disabling capsule rendering to prevent mesh clipping the camera
-            GetComponent<MeshRenderer>().enabled = false;
-            
-            // syncing head rotation
-            _headRotationX = headObject.transform.rotation.x;
-            _headRotationY = headObject.transform.rotation.y;
+        // Apply movement
+        rb.MovePosition(rb.position + move * speed * Time.fixedDeltaTime);
+    }
 
-            if (Application.isEditor)
-                // DEV LOG (2:00 am : 02-Oct-2024)
-                // ------------------------------------------------------------------------------------------
-                // This check had to be done because unity is made by a couple of toddlers with computers who
-                // think disabling editor hotkeys when running in game mode is "dumb".
-                // ------------------------------------------------------------------------------------------
-                _crouchKey = KeyCode.C;
+    void Update()
+    {
+        // Handle mouse look
+        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
+        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
 
-            _playerWalk = AudioManager.Instance.CreateEventInstance(FmodEvents.Instance.Walk);
-        }
+        verticalRotation -= mouseY;
+        verticalRotation = Mathf.Clamp(verticalRotation, -90f, 90f); // Clamp vertical rotation
 
-        
-        private void Update()
-        {
-            if (!GlobalVariables.Paused)
-            {
-                // _playerRigidbody.isKinematic = false;
-                // ToggleMouseCapture(true);
-                
-                
-                // crouch and speed logic
-                if (Input.GetKey(_crouchKey))
-                {
-                    _currentSpeed = crouchingSpeed;
-                    // TODO: Add head lowering, collider lowering and head collision checks (maybe done in next release)
-                    // TODO[UNRELATED_TO_THIS_SCRIPT]: Work on enemies, basic melee and projectile enemies
-                }
-                else if (!_headWillCollide)
-                {
-                    _currentSpeed = Input.GetKey(KeyCode.LeftShift) ? sprintingSpeed : walkingSpeed;
-                }
-                
-                _currentVel = _playerRigidbody.velocity;
-                
-                if (IsGrounded() && Input.GetKeyDown(KeyCode.Space))
-                {
-                    _currentVel.y = jumpVelocity;
-                }
-                
-                UpdateInputDirectionWASD();
-                _direction = Vector3.Lerp(_direction, (transform.rotation * _inputDirection).normalized, Time.deltaTime * lerpSpeed);
-
-                if (_direction != Vector3.zero)
-                {
-                    _currentVel.x = _direction.x * _currentSpeed;
-                    _currentVel.z = _direction.z * _currentSpeed;
-                }
-                else
-                {
-                    var tempY = _currentVel.y;
-                    _currentVel = Vector3.MoveTowards(_currentVel, Vector3.zero, _currentSpeed);
-                    _currentVel.y = tempY;
-                }
-                
-                _playerRigidbody.velocity = _currentVel;
-
-                // mouse logic
-                _headRotationX -= Input.GetAxis("Mouse Y") * mouseSensitivity;
-                _headRotationY += Input.GetAxis("Mouse X") * mouseSensitivity;
-
-                _headRotationX = Mathf.Clamp(_headRotationX, -89f, 89f);
-
-                headObject.transform.localEulerAngles = new Vector3(_headRotationX, 0, 0);
-                transform.localEulerAngles = new Vector3(0, _headRotationY, 0);
-                
-                
-            }
-            else
-            {
-                // _playerRigidbody.isKinematic = true;
-                // ToggleMouseCapture(false);
-            }
-        }
-
-
-        private bool IsGrounded()
-        {
-            return Physics.SphereCast(transform.position, 0.9f, Vector3.down, out RaycastHit hit, 0.5f, groundMask);
-        }
-
-
-        private void UpdateInputDirectionWASD()
-        {
-            if (Input.GetKey(KeyCode.W))
-            {
-                _inputDirection.z = 1;
-             
-            } 
-            else if (Input.GetKey(KeyCode.S))
-            {
-                _inputDirection.z = -1;
-       
-            }
-            else
-            {
-                _inputDirection.z = 0;
-            
-            }
-
-            if (Input.GetKey(KeyCode.D))
-            {
-                _inputDirection.x = 1;
-          
-            }
-            else if (Input.GetKey(KeyCode.A))
-            {
-                _inputDirection.x = -1;
-            
-            }
-            else
-            {
-                _inputDirection.x = 0;
-           
-            }
-        }
-      
+        playerCamera.localRotation = Quaternion.Euler(verticalRotation, 0f, 0f);
+        transform.Rotate(Vector3.up * mouseX);
     }
 }
