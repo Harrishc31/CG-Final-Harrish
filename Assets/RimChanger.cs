@@ -15,11 +15,11 @@ public class RimChanger : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Z))
         {
-            GetComponent<Renderer>().material.SetColor("_RimColor", Color.white);
+            GetComponent<Renderer>().material.SetColor("_RimColor", Color.red);
         }
         if (Input.GetKeyDown(KeyCode.X))
         {
-            GetComponent<Renderer>().material.SetColor("_RimColor", Color.red);
+            GetComponent<Renderer>().material.SetColor("_RimColor", Color.black);
         }
     }
 
